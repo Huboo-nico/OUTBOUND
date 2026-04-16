@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
 import { useDropzone } from 'react-dropzone';
 import { toast, Toaster } from 'sonner';
 import { 
@@ -102,43 +101,22 @@ export default function App() {
       const base64String = await base64Promise;
       const base64Data = base64String.split(',')[1];
 
-      // Initialize Gemini
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: file.type,
-                data: base64Data,
-              },
-            },
-            {
-              text: "Analiza esta captura de pantalla de un perfil de Instagram y extrae la siguiente información en formato JSON: brandName (Nombre de la marca), username (Handle/Username con @), followers (Número de seguidores como entero), industry (Industria/Sector inferido), contact (Email si aparece), phone (Número de teléfono si aparece), profileLink (Link al perfil si se puede inferir).",
-            },
-          ],
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              brandName: { type: Type.STRING },
-              username: { type: Type.STRING },
-              followers: { type: Type.NUMBER },
-              industry: { type: Type.STRING },
-              contact: { type: Type.STRING },
-              phone: { type: Type.STRING },
-              profileLink: { type: Type.STRING },
-            },
-            required: ["brandName", "username", "followers", "industry"],
-          },
-        },
+      // Call server-side API for analysis
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: base64Data,
+          mimeType: file.type
+        }),
       });
 
-      const result = JSON.parse(response.text);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al analizar la imagen');
+      }
+
+      const result = await response.json();
       setExtractedData(result);
       toast.success('Análisis completado con éxito');
     } catch (error: any) {
